@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  log-generator:
+    build: .
+    container_name: http-log-generator
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+    restart: unless-stopped
+    # Health check endpoint: http://localhost:8080/health
+    # Logs will be available via: docker logs http-log-generator

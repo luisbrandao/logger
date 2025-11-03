@@ -1,0 +1,4 @@
+routes:
+  - endpoint: "alfa"
+    rate: 1
+    fail: 0
