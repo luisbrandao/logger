@@ -1,10 +1,10 @@
 routes:
   - endpoint: "alfa"
     rate: 5
-    fail: 0
+    fail: 5
   - endpoint: "beta"
     rate: 5
-    fail: 0
+    fail: 5
   - endpoint: "gama"
     rate: 5
-    fail: 0    
+    fail: 5    
