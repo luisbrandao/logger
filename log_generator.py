@@ -1,21 +1,22 @@
 #!/usr/bin/env python3
 """
-Fake HTTP Log Generator
-Simulates nginx access logs for testing scaling systems
+Simple JSON Log Generator
+Generates JSON logs for testing logging systems
 """
 
+import json
 import yaml
 import time
 import random
 import sys
 from datetime import datetime
-from threading import Thread
-from typing import List, Dict
+from threading import Thread, Lock
+from typing import Dict
 from flask import Flask, jsonify
 
 
 class LogGenerator:
-    """Generates fake nginx-style access logs"""
+    """Generates simple JSON logs"""
     
     def __init__(self, config_path: str = 'config.yaml'):
         """Initialize the log generator with configuration"""
@@ -23,13 +24,7 @@ class LogGenerator:
             self.config = yaml.safe_load(f)
         
         self.routes = self.config.get('routes', [])
-        self.fake_ips = self._generate_fake_ips()
-        self.user_agents = [
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36',
-            'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15',
-        ]
+        self.print_lock = Lock()  # Lock for thread-safe printing
         self.app = self._setup_flask_app()
     
     def _setup_flask_app(self) -> Flask:
@@ -51,38 +46,15 @@ class LogGenerator:
         print("Starting health check server on port 8080...", file=sys.stderr)
         self.app.run(host='0.0.0.0', port=8080, debug=False, use_reloader=False)
     
-    def _generate_fake_ips(self) -> List[str]:
-        """Generate a pool of fake IP addresses"""
-        ips = []
-        for _ in range(50):
-            ip = f"{random.randint(1, 255)}.{random.randint(0, 255)}.{random.randint(0, 255)}.{random.randint(1, 255)}"
-            ips.append(ip)
-        return ips
-    
-    def _format_nginx_log(self, endpoint: str, status_code: int) -> str:
-        """Format a log entry to mimic nginx access log"""
-        ip = random.choice(self.fake_ips)
-        timestamp = datetime.now().strftime("%d/%b/%Y:%H:%M:%S %z")
-        if not timestamp.endswith('+0000'):
-            timestamp = datetime.now().strftime("%d/%b/%Y:%H:%M:%S +0000")
+    def _format_log_entry(self, endpoint: str, status_code: int) -> str:
+        """Format a log entry as JSON"""
+        log_entry = {
+            "timestamp": datetime.now().isoformat(),
+            "route": f"/{endpoint}",
+            "code": status_code
+        }
         
-        method = "GET"
-        path = f"/{endpoint}"
-        protocol = "HTTP/1.1"
-        bytes_sent = random.randint(200, 5000) if status_code == 200 else random.randint(150, 500)
-        referer = "-"
-        user_agent = random.choice(self.user_agents)
-        response_time = round(random.uniform(0.001, 0.500), 3) if status_code == 200 else round(random.uniform(0.001, 2.0), 3)
-        
-        # Standard nginx log format
-        log_entry = (
-            f'{ip} - - [{timestamp}] '
-            f'"{method} {path} {protocol}" '
-            f'{status_code} {bytes_sent} '
-            f'"{referer}" "{user_agent}"'
-        )
-        
-        return log_entry
+        return json.dumps(log_entry)
     
     def _generate_logs_for_route(self, route_config: Dict):
         """Generate logs for a specific route based on its configuration"""
@@ -100,9 +72,10 @@ class LogGenerator:
                 # Determine if this request should fail
                 status_code = 500 if random.random() * 100 < fail_percentage else 200
                 
-                # Generate and print the log
-                log_entry = self._format_nginx_log(endpoint, status_code)
-                print(log_entry, flush=True)
+                # Generate and print the log (thread-safe)
+                log_entry = self._format_log_entry(endpoint, status_code)
+                with self.print_lock:
+                    print(log_entry, flush=True)
                 
                 # Wait for the next log entry
                 time.sleep(interval)
