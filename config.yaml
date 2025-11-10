@@ -1,7 +1,7 @@
 routes:
   - endpoint: "alfa"
     rate: 1
-    fail: 0
+    fail: 10
   - endpoint: "beta"
     rate: 2
     fail: 0
